@@ -1,34 +1,67 @@
-package com.example.entity;
+package com.example.dto;
 
-import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.util.Date;
 
-@Entity
-@Table(name = "java_post")
-public class Post {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+/**
+ * Data Transfer Object cho Post entity
+ * Dùng cho cả hiển thị, tạo mới và cập nhật bài viết
+ */
+public class PostDTO {
     private Long id;
 
-    @Column(name = "topic_id")
+    @NotNull(message = "Topic ID is required")
     private Long topicId;
+
+    @NotBlank(message = "Title is required")
     private String title;
+
+    @NotBlank(message = "Slug is required")
     private String slug;
+
+    @NotBlank(message = "Detail is required")
     private String detail;
+
     private String image;
+
+    @NotBlank(message = "Type is required")
     private String type;
+
     private String metakey;
     private String metadesc;
-    @Column(name = "created_at")
     private Date createdAt;
-    @Column(name = "updated_at")
     private Date updatedAt;
-    @Column(name = "created_by")
-    private int createdBy;
-    @Column(name = "updated_by")
-    private int updatedBy;
-    private int status;
+    private int status = 1; // Default to active
+
+    // Fields for related entity information
+    private String topicName;
+
+    // Flag để xác định DTO được sử dụng cho mục đích gì
+    private transient boolean isCreateOperation;
+    private transient boolean isUpdateOperation;
+
+    // Constructors
+    public PostDTO() {
+    }
+
+    /**
+     * Constructor cho việc tạo bài viết mới
+     */
+    public static PostDTO forCreate() {
+        PostDTO dto = new PostDTO();
+        dto.isCreateOperation = true;
+        return dto;
+    }
+
+    /**
+     * Constructor cho việc cập nhật bài viết
+     */
+    public static PostDTO forUpdate() {
+        PostDTO dto = new PostDTO();
+        dto.isUpdateOperation = true;
+        return dto;
+    }
 
     // Getters and Setters
     public Long getId() {
@@ -119,27 +152,27 @@ public class Post {
         this.updatedAt = updatedAt;
     }
 
-    public int getCreatedBy() {
-        return createdBy;
-    }
-
-    public void setCreatedBy(int createdBy) {
-        this.createdBy = createdBy;
-    }
-
-    public int getUpdatedBy() {
-        return updatedBy;
-    }
-
-    public void setUpdatedBy(int updatedBy) {
-        this.updatedBy = updatedBy;
-    }
-
     public int getStatus() {
         return status;
     }
 
     public void setStatus(int status) {
         this.status = status;
+    }
+
+    public String getTopicName() {
+        return topicName;
+    }
+
+    public void setTopicName(String topicName) {
+        this.topicName = topicName;
+    }
+
+    public boolean isCreateOperation() {
+        return isCreateOperation;
+    }
+
+    public boolean isUpdateOperation() {
+        return isUpdateOperation;
     }
 }

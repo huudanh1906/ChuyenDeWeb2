@@ -1,38 +1,72 @@
-package com.example.entity;
+package com.example.dto;
 
-import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import java.util.Date;
 
-@Entity
-@Table(name = "java_user")
-public class User {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+/**
+ * Data Transfer Object for User entity
+ * Dùng cho cả hiển thị, tạo mới và cập nhật người dùng
+ */
+public class UserDTO {
     private Long id;
 
+    @NotBlank(message = "Name is required")
     private String name;
+
+    @NotBlank(message = "Email is required")
+    @Email(message = "Email should be valid")
     private String email;
+
+    @Size(max = 15, message = "Phone number should not exceed 15 characters")
+    @Pattern(regexp = "^[0-9]*$", message = "Phone number should contain only digits")
     private String phone;
+
+    @NotBlank(message = "Username is required")
+    @Size(min = 5, max = 20, message = "Username must be between 5 and 20 characters")
     private String username;
-    private String password;
+
+    private String password; // Khi tạo mới cần mật khẩu, khi hiển thị sẽ bỏ qua trường này
+
     private String address;
     private String image;
     private String roles;
-
-    @Column(name = "created_at")
     private Date createdAt;
-
-    @Column(name = "updated_at")
     private Date updatedAt;
-
-    @Column(name = "created_by")
-    private int createdBy;
-
-    @Column(name = "updated_by")
-    private int updatedBy;
-
     private int status;
+
+    // Flag để xác định DTO được sử dụng cho mục đích gì
+    private transient boolean isCreateOperation;
+    private transient boolean isUpdateOperation;
+
+    // Constructors
+    public UserDTO() {
+    }
+
+    /**
+     * Constructor cho việc tạo người dùng mới
+     */
+    public static UserDTO forCreate() {
+        UserDTO dto = new UserDTO();
+        dto.isCreateOperation = true;
+        return dto;
+    }
+
+    /**
+     * Constructor cho việc cập nhật người dùng
+     */
+    public static UserDTO forUpdate() {
+        UserDTO dto = new UserDTO();
+        dto.isUpdateOperation = true;
+        return dto;
+    }
+
+    // Validation methods
+    public boolean requiresPassword() {
+        return isCreateOperation || (password != null && !password.isEmpty());
+    }
 
     // Getters and Setters
     public Long getId() {
@@ -123,27 +157,19 @@ public class User {
         this.updatedAt = updatedAt;
     }
 
-    public int getCreatedBy() {
-        return createdBy;
-    }
-
-    public void setCreatedBy(int createdBy) {
-        this.createdBy = createdBy;
-    }
-
-    public int getUpdatedBy() {
-        return updatedBy;
-    }
-
-    public void setUpdatedBy(int updatedBy) {
-        this.updatedBy = updatedBy;
-    }
-
     public int getStatus() {
         return status;
     }
 
     public void setStatus(int status) {
         this.status = status;
+    }
+
+    public boolean isCreateOperation() {
+        return isCreateOperation;
+    }
+
+    public boolean isUpdateOperation() {
+        return isUpdateOperation;
     }
 }

@@ -14,12 +14,25 @@ public class Brand {
     private String name;
     private String slug;
     private String image;
+
+    @Column(name = "sort_order")
+    private int sortOrder;
+
     private String metakey;
     private String metadesc;
-    private Date created_at;
-    private Date updated_at;
-    private int created_by;
-    private int updated_by;
+
+    @Column(name = "created_at")
+    private Date createdAt;
+
+    @Column(name = "updated_at")
+    private Date updatedAt;
+
+    @Column(name = "created_by")
+    private int createdBy;
+
+    @Column(name = "updated_by")
+    private int updatedBy;
+
     private int status;
 
     // Getters and Setters
@@ -72,35 +85,35 @@ public class Brand {
     }
 
     public Date getCreatedAt() {
-        return created_at;
+        return createdAt;
     }
 
-    public void setCreatedAt(Date created_at) {
-        this.created_at = created_at;
+    public void setCreatedAt(Date createdAt) {
+        this.createdAt = createdAt;
     }
 
     public Date getUpdatedAt() {
-        return updated_at;
+        return updatedAt;
     }
 
-    public void setUpdatedAt(Date updated_at) {
-        this.updated_at = updated_at;
+    public void setUpdatedAt(Date updatedAt) {
+        this.updatedAt = updatedAt;
     }
 
     public int getCreatedBy() {
-        return created_by;
+        return createdBy;
     }
 
-    public void setCreatedBy(int created_by) {
-        this.created_by = created_by;
+    public void setCreatedBy(int createdBy) {
+        this.createdBy = createdBy;
     }
 
     public int getUpdatedBy() {
-        return updated_by;
+        return updatedBy;
     }
 
-    public void setUpdatedBy(int updated_by) {
-        this.updated_by = updated_by;
+    public void setUpdatedBy(int updatedBy) {
+        this.updatedBy = updatedBy;
     }
 
     public int getStatus() {

@@ -2,6 +2,7 @@ package com.example.entity;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import java.util.Date;
 
 @Entity
 @Table(name = "java_orderdetail")
@@ -11,11 +12,21 @@ public class OrderDetail {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private Long order_id;
-    private Long product_id;
-    private BigDecimal price;
+    @Column(name = "order_id")
+    private Long orderId;
+
+    @Column(name = "product_id")
+    private Long productId;
+
     private int qty;
+    private BigDecimal price;
     private BigDecimal amount;
+
+    @Column(name = "created_at")
+    private Date createdAt;
+
+    @Column(name = "updated_at")
+    private Date updatedAt;
 
     // Getters and Setters
     public Long getId() {
@@ -27,19 +38,19 @@ public class OrderDetail {
     }
 
     public Long getOrderId() {
-        return order_id;
+        return orderId;
     }
 
-    public void setOrderId(Long order_id) {
-        this.order_id = order_id;
+    public void setOrderId(Long orderId) {
+        this.orderId = orderId;
     }
 
     public Long getProductId() {
-        return product_id;
+        return productId;
     }
 
-    public void setProductId(Long product_id) {
-        this.product_id = product_id;
+    public void setProductId(Long productId) {
+        this.productId = productId;
     }
 
     public BigDecimal getPrice() {
