@@ -126,7 +126,7 @@ public class ProductService {
 
                     filteredProducts = filteredProducts.stream()
                             .filter(product -> {
-                                BigDecimal effectivePrice = product.getPriceSale() != null ? product.getPriceSale()
+                                BigDecimal effectivePrice = product.getPricesale() != null ? product.getPricesale()
                                         : product.getPrice();
                                 return effectivePrice.compareTo(min) >= 0 && effectivePrice.compareTo(max) <= 0;
                             })
@@ -140,7 +140,7 @@ public class ProductService {
         // Filter promotion products if specified
         if (onPromotion != null && onPromotion) {
             filteredProducts = filteredProducts.stream()
-                    .filter(product -> product.getPriceSale() != null)
+                    .filter(product -> product.getPricesale() != null)
                     .collect(Collectors.toList());
         }
 
@@ -152,12 +152,12 @@ public class ProductService {
     }
 
     /**
-     * Get sale products (with price_sale > 0)
+     * Get sale products (with pricesale > 0)
      */
     public Map<String, Object> getSaleProducts(int page, int size) {
         List<Product> allSaleProducts = getAllActiveProducts().stream()
-                .filter(product -> product.getPriceSale() != null
-                        && product.getPriceSale().compareTo(BigDecimal.ZERO) > 0)
+                .filter(product -> product.getPricesale() != null
+                        && product.getPricesale().compareTo(BigDecimal.ZERO) > 0)
                 .collect(Collectors.toList());
 
         // Paginate
@@ -297,7 +297,9 @@ public class ProductService {
 
         List<Product> matchingProducts = getAllActiveProducts().stream()
                 .filter(product -> product.getName().toLowerCase().contains(searchTerm) ||
-                        product.getDetail().toLowerCase().contains(searchTerm))
+                        product.getDetail().toLowerCase().contains(searchTerm) ||
+                        (product.getDescription() != null &&
+                                product.getDescription().toLowerCase().contains(searchTerm)))
                 .collect(Collectors.toList());
 
         // Paginate
@@ -351,11 +353,18 @@ public class ProductService {
         product.setSlug(productDetails.getSlug());
         product.setDetail(productDetails.getDetail());
         product.setPrice(productDetails.getPrice());
-        product.setPriceSale(productDetails.getPriceSale());
+        product.setPricesale(productDetails.getPricesale());
         product.setCategoryId(productDetails.getCategoryId());
         product.setBrandId(productDetails.getBrandId());
         product.setStatus(productDetails.getStatus());
         product.setUpdatedAt(new Date());
+        product.setQty(productDetails.getQty());
+        product.setDescription(productDetails.getDescription());
+
+        // Set updatedBy if provided
+        if (productDetails.getUpdatedBy() > 0) {
+            product.setUpdatedBy(productDetails.getUpdatedBy());
+        }
 
         // Handle image upload if provided
         if (imageFile != null && !imageFile.isEmpty()) {
@@ -383,15 +392,18 @@ public class ProductService {
         product.setSlug(productDetails.getSlug());
         product.setDetail(productDetails.getDetail());
         product.setPrice(productDetails.getPrice());
-        product.setPriceSale(productDetails.getPriceSale());
+        product.setPricesale(productDetails.getPricesale());
         product.setCategoryId(productDetails.getCategoryId());
         product.setBrandId(productDetails.getBrandId());
         product.setStatus(productDetails.getStatus());
         product.setUpdatedAt(new Date());
-        product.setUpdatedBy(productDetails.getUpdatedBy());
         product.setQty(productDetails.getQty());
-        product.setMetakey(productDetails.getMetakey());
-        product.setMetadesc(productDetails.getMetadesc());
+        product.setDescription(productDetails.getDescription());
+
+        // Set updatedBy if provided
+        if (productDetails.getUpdatedBy() > 0) {
+            product.setUpdatedBy(productDetails.getUpdatedBy());
+        }
 
         // Handle image upload if provided
         if (imageFile != null && !imageFile.isEmpty()) {
@@ -472,15 +484,15 @@ public class ProductService {
         switch (sortOrder) {
             case "high_to_low":
                 products.sort((p1, p2) -> {
-                    BigDecimal price1 = p1.getPriceSale() != null ? p1.getPriceSale() : p1.getPrice();
-                    BigDecimal price2 = p2.getPriceSale() != null ? p2.getPriceSale() : p2.getPrice();
+                    BigDecimal price1 = p1.getPricesale() != null ? p1.getPricesale() : p1.getPrice();
+                    BigDecimal price2 = p2.getPricesale() != null ? p2.getPricesale() : p2.getPrice();
                     return price2.compareTo(price1);
                 });
                 break;
             case "low_to_high":
                 products.sort((p1, p2) -> {
-                    BigDecimal price1 = p1.getPriceSale() != null ? p1.getPriceSale() : p1.getPrice();
-                    BigDecimal price2 = p2.getPriceSale() != null ? p2.getPriceSale() : p2.getPrice();
+                    BigDecimal price1 = p1.getPricesale() != null ? p1.getPricesale() : p1.getPrice();
+                    BigDecimal price2 = p2.getPricesale() != null ? p2.getPricesale() : p2.getPrice();
                     return price1.compareTo(price2);
                 });
                 break;

@@ -1,6 +1,8 @@
 package com.example.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Size;
+
 import java.util.Date;
 
 @Entity
@@ -13,12 +15,18 @@ public class User {
 
     private String name;
     private String email;
+
+    @Size(min = 10, max = 10, message = "Phone number must be 10 digits")
     private String phone;
+    
     private String username;
     private String password;
     private String address;
     private String image;
     private String roles;
+
+    @Column(name = "gender", columnDefinition = "TINYINT DEFAULT 1")
+    private Integer gender;
 
     @Column(name = "created_at")
     private Date createdAt;
@@ -105,6 +113,14 @@ public class User {
 
     public void setRoles(String roles) {
         this.roles = roles;
+    }
+
+    public Integer getGender() {
+        return gender;
+    }
+
+    public void setGender(Integer gender) {
+        this.gender = gender;
     }
 
     public Date getCreatedAt() {

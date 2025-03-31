@@ -3,11 +3,15 @@ package com.example.controller.backend;
 import com.example.entity.Category;
 import com.example.service.CategoryService;
 import com.example.service.FileStorageService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import jakarta.validation.ConstraintViolationException;
 
 import java.io.IOException;
 import java.util.*;
@@ -16,6 +20,8 @@ import java.util.*;
 @RequestMapping("/api/categories")
 @CrossOrigin(origins = "*")
 public class CategoryController {
+
+    private static final Logger logger = LoggerFactory.getLogger(CategoryController.class);
 
     @Autowired
     private CategoryService categoryService;
@@ -28,7 +34,7 @@ public class CategoryController {
      */
     @GetMapping
     public ResponseEntity<List<Category>> index() {
-        List<Category> categories = categoryService.getAllActiveCategories();
+        List<Category> categories = categoryService.getAllNonTrashedCategories();
         return ResponseEntity.ok(categories);
     }
 
@@ -38,34 +44,63 @@ public class CategoryController {
     @PostMapping
     public ResponseEntity<Map<String, String>> store(
             @RequestParam("name") String name,
-            @RequestParam("slug") String slug,
-            @RequestParam("parent_id") Long parentId,
-            @RequestParam("sort_order") Integer sortOrder,
-            @RequestParam("metakey") String metakey,
-            @RequestParam("metadesc") String metadesc,
-            @RequestParam("status") int status,
-            @RequestParam(value = "image", required = false) MultipartFile imageFile) {
+            @RequestParam(value = "slug", required = false) String slug,
+            @RequestParam(value = "parent_id", required = false, defaultValue = "0") int parentId,
+            @RequestParam(value = "sort_order", required = false, defaultValue = "0") int sortOrder,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam(value = "status", required = false, defaultValue = "2") int status,
+            @RequestParam(value = "image", required = false) MultipartFile imageFile,
+            Authentication authentication) {
 
         try {
             Category category = new Category();
             category.setName(name);
+
+            // Nếu slug không được cung cấp, sẽ tự động tạo từ tên
+            if (slug == null || slug.isEmpty()) {
+                slug = categoryService.generateSlug(name);
+            }
             category.setSlug(slug);
+
             category.setParentId(parentId);
             category.setSortOrder(sortOrder);
-            category.setMetakey(metakey);
-            category.setMetadesc(metadesc);
+            category.setDescription(description);
             category.setStatus(status);
 
-            categoryService.createCategory(category, imageFile);
+            // Set created_by từ người dùng đã xác thực
+            if (authentication != null) {
+                // Giả sử bạn có thể lấy ID người dùng từ authentication
+                // Điều này phụ thuộc vào cách bạn đã cấu hình xác thực
+                // Đây chỉ là một ví dụ
+                category.setCreatedBy(1); // Giá trị mặc định hoặc lấy từ authentication
+            } else {
+                category.setCreatedBy(1); // Mặc định nếu không có authentication
+            }
+
+            Category savedCategory = categoryService.createCategory(category, imageFile);
 
             Map<String, String> response = new HashMap<>();
             response.put("message", "Category created successfully");
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (IOException e) {
+            logger.error("Failed to upload image: {}", e.getMessage(), e);
             Map<String, String> response = new HashMap<>();
             response.put("error", "Failed to upload image: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        } catch (IllegalArgumentException e) {
+            // Bắt các lỗi với tham số không hợp lệ
+            logger.error("Invalid argument: {}", e.getMessage(), e);
+            Map<String, String> response = new HashMap<>();
+            response.put("error", "Invalid argument: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        } catch (ConstraintViolationException e) {
+            // Bắt các lỗi validation
+            logger.error("Validation error: {}", e.getMessage(), e);
+            Map<String, String> response = new HashMap<>();
+            response.put("error", "Validation error: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         } catch (Exception e) {
+            logger.error("Error creating category: {}", e.getMessage(), e);
             Map<String, String> response = new HashMap<>();
             response.put("error", "Error creating category: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
@@ -94,14 +129,14 @@ public class CategoryController {
     public ResponseEntity<Map<String, String>> update(
             @PathVariable Long id,
             @RequestParam("name") String name,
-            @RequestParam("slug") String slug,
-            @RequestParam("parent_id") Long parentId,
-            @RequestParam("sort_order") Integer sortOrder,
-            @RequestParam("metakey") String metakey,
-            @RequestParam("metadesc") String metadesc,
-            @RequestParam("status") int status,
+            @RequestParam(value = "slug", required = false) String slug,
+            @RequestParam(value = "parent_id", required = false, defaultValue = "0") int parentId,
+            @RequestParam(value = "sort_order", required = false, defaultValue = "0") int sortOrder,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam(value = "status", required = false, defaultValue = "2") int status,
             @RequestParam(value = "image", required = false) MultipartFile imageFile,
-            @RequestParam(value = "imageBase64", required = false) String imageBase64) {
+            @RequestParam(value = "imageBase64", required = false) String imageBase64,
+            Authentication authentication) {
 
         try {
             Optional<Category> optionalCategory = categoryService.getCategoryById(id);
@@ -113,12 +148,25 @@ public class CategoryController {
 
             Category categoryDetails = new Category();
             categoryDetails.setName(name);
+
+            // Nếu slug không được cung cấp, sẽ tự động tạo từ tên
+            if (slug == null || slug.isEmpty()) {
+                slug = categoryService.generateSlug(name);
+            }
             categoryDetails.setSlug(slug);
+
             categoryDetails.setParentId(parentId);
             categoryDetails.setSortOrder(sortOrder);
-            categoryDetails.setMetakey(metakey);
-            categoryDetails.setMetadesc(metadesc);
+            categoryDetails.setDescription(description);
             categoryDetails.setStatus(status);
+
+            // Set updated_by từ người dùng đã xác thực
+            if (authentication != null) {
+                // Giả sử bạn có thể lấy ID người dùng từ authentication
+                // Điều này phụ thuộc vào cách bạn đã cấu hình xác thực
+                // Đây chỉ là một ví dụ
+                categoryDetails.setUpdatedBy(1); // Giá trị mặc định hoặc lấy từ authentication
+            }
 
             Category updatedCategory;
 
@@ -142,10 +190,12 @@ public class CategoryController {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
             }
         } catch (IOException e) {
+            logger.error("Failed to upload image: {}", e.getMessage());
             Map<String, String> response = new HashMap<>();
             response.put("error", "Failed to upload image: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         } catch (Exception e) {
+            logger.error("Error updating category: {}", e.getMessage());
             Map<String, String> response = new HashMap<>();
             response.put("error", "Error updating category: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
@@ -170,15 +220,38 @@ public class CategoryController {
     }
 
     /**
-     * Toggle the status of the specified resource.
+     * Toggle the status of the specified resource between active (1) and inactive
+     * (2).
+     * If the category is in trashed state (0), the status won't be changed.
      */
     @PutMapping("/{id}/status")
     public ResponseEntity<Map<String, String>> status(@PathVariable Long id) {
+        // Kiểm tra xem category có tồn tại không
+        Optional<Category> categoryOptional = categoryService.getCategoryById(id);
+        if (categoryOptional.isEmpty()) {
+            Map<String, String> response = new HashMap<>();
+            response.put("error", "Category not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+
+        // Kiểm tra status hiện tại
+        Category category = categoryOptional.get();
+        int currentStatus = category.getStatus();
+
+        // Toggle status
         Category updatedCategory = categoryService.toggleCategoryStatus(id);
         if (updatedCategory != null) {
+            int newStatus = updatedCategory.getStatus();
             Map<String, String> response = new HashMap<>();
-            response.put("message", "Category status updated successfully");
-            response.put("status", String.valueOf(updatedCategory.getStatus()));
+
+            // Xử lý trường hợp category đang ở trạng thái trashed
+            if (currentStatus == 0 && newStatus == 0) {
+                response.put("message", "Category is in trash. Restore it first to change status.");
+            } else {
+                response.put("message", "Category status updated successfully");
+            }
+
+            response.put("status", String.valueOf(newStatus));
             return ResponseEntity.ok(response);
         } else {
             Map<String, String> response = new HashMap<>();

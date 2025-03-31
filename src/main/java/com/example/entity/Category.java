@@ -11,19 +11,23 @@ public class Category {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(length = 1000)
     private String name;
+
+    @Column(length = 1000)
     private String slug;
 
+    @Column(length = 1000)
+    private String image;
+
     @Column(name = "parent_id")
-    private Long parentId;
+    private int parentId = 0;
 
     @Column(name = "sort_order")
-    private int sortOrder;
+    private int sortOrder = 0;
 
-    private String image;
-    private int level;
-    private String metakey;
-    private String metadesc;
+    @Column(length = 1000)
+    private String description;
 
     @Column(name = "created_at")
     private Date createdAt;
@@ -35,9 +39,10 @@ public class Category {
     private int createdBy;
 
     @Column(name = "updated_by")
-    private int updatedBy;
+    private Integer updatedBy;
 
-    private int status;
+    @Column(columnDefinition = "TINYINT")
+    private int status = 2; // Default to 2 as shown in the DB
 
     // Getters and Setters
     public Long getId() {
@@ -64,11 +69,19 @@ public class Category {
         this.slug = slug;
     }
 
-    public Long getParentId() {
+    public String getImage() {
+        return image;
+    }
+
+    public void setImage(String image) {
+        this.image = image;
+    }
+
+    public int getParentId() {
         return parentId;
     }
 
-    public void setParentId(Long parentId) {
+    public void setParentId(int parentId) {
         this.parentId = parentId;
     }
 
@@ -80,36 +93,12 @@ public class Category {
         this.sortOrder = sortOrder;
     }
 
-    public String getImage() {
-        return image;
+    public String getDescription() {
+        return description;
     }
 
-    public void setImage(String image) {
-        this.image = image;
-    }
-
-    public int getLevel() {
-        return level;
-    }
-
-    public void setLevel(int level) {
-        this.level = level;
-    }
-
-    public String getMetakey() {
-        return metakey;
-    }
-
-    public void setMetakey(String metakey) {
-        this.metakey = metakey;
-    }
-
-    public String getMetadesc() {
-        return metadesc;
-    }
-
-    public void setMetadesc(String metadesc) {
-        this.metadesc = metadesc;
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     public Date getCreatedAt() {
@@ -136,11 +125,11 @@ public class Category {
         this.createdBy = createdBy;
     }
 
-    public int getUpdatedBy() {
+    public Integer getUpdatedBy() {
         return updatedBy;
     }
 
-    public void setUpdatedBy(int updatedBy) {
+    public void setUpdatedBy(Integer updatedBy) {
         this.updatedBy = updatedBy;
     }
 

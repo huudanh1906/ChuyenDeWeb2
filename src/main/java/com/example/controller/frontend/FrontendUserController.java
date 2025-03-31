@@ -60,6 +60,14 @@ public class FrontendUserController {
             user.setAddress(request.get("address").toString());
             user.setPassword(hashPassword(request.get("password").toString()));
             user.setUsername(request.get("username").toString());
+
+            // Set gender with default value 1 (male) if not provided
+            Integer gender = 1; // Mặc định là nam
+            if (request.containsKey("gender") && request.get("gender") != null) {
+                gender = Integer.parseInt(request.get("gender").toString());
+            }
+            user.setGender(gender);
+
             user.setRoles("customer");
             user.setCreatedAt(new Date());
             user.setCreatedBy(1);
@@ -146,6 +154,7 @@ public class FrontendUserController {
             @RequestParam("phone") String phone,
             @RequestParam("email") String email,
             @RequestParam("address") String address,
+            @RequestParam(value = "gender", required = false) Integer gender,
             @RequestParam(value = "password", required = false) String password,
             @RequestParam(value = "image", required = false) String imageBase64) {
 
@@ -171,6 +180,9 @@ public class FrontendUserController {
             user.setPhone(phone);
             user.setEmail(email);
             user.setAddress(address);
+            if (gender != null) {
+                user.setGender(gender);
+            }
 
             // Update password if provided
             if (password != null && !password.isEmpty()) {

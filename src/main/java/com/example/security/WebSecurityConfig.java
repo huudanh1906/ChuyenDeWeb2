@@ -67,12 +67,23 @@ public class WebSecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         logger.debug("Configuring CORS");
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("*"));
+        configuration.setAllowedOrigins(Arrays.asList(
+                "http://localhost:3000", // Frontend React app
+                "http://127.0.0.1:3000",
+                "http://localhost:5173", // Vite dev server
+                "http://127.0.0.1:5173"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration
-                .setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Auth-Token", "X-Requested-With"));
+                .setAllowedHeaders(Arrays.asList(
+                        "Authorization",
+                        "Content-Type",
+                        "X-Auth-Token",
+                        "X-Requested-With",
+                        "x-csrf-token" // Thêm header x-csrf-token
+                ));
         configuration.setExposedHeaders(Arrays.asList("X-Auth-Token"));
-        configuration.setAllowCredentials(false);
+        configuration.setAllowCredentials(true); // Cho phép credentials
+        configuration.setMaxAge(3600L); // Cache CORS preflight trong 1 giờ
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
@@ -93,6 +104,8 @@ public class WebSecurityConfig {
                     auth.requestMatchers("/api/auth/**").permitAll()
                             .requestMatchers("/api/frontend/**").permitAll()
                             .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                            .requestMatchers("/imgs/**").permitAll()
+                            .requestMatchers("/uploads/**").permitAll()
                             .anyRequest().authenticated();
                 });
 

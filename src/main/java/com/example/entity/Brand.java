@@ -11,15 +11,20 @@ public class Brand {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(length = 1000)
     private String name;
+
+    @Column(length = 1000)
     private String slug;
+
+    @Column(length = 1000)
     private String image;
 
     @Column(name = "sort_order")
-    private int sortOrder;
+    private int sortOrder = 0;
 
-    private String metakey;
-    private String metadesc;
+    @Column(length = 1000)
+    private String description;
 
     @Column(name = "created_at")
     private Date createdAt;
@@ -31,9 +36,16 @@ public class Brand {
     private int createdBy;
 
     @Column(name = "updated_by")
-    private int updatedBy;
+    private Integer updatedBy;
 
-    private int status;
+    /**
+     * Status values:
+     * 0 - Trashed (soft deleted)
+     * 1 - Active
+     * 2 - Inactive (default)
+     */
+    @Column(columnDefinition = "TINYINT")
+    private int status = 2; // Default to 2 as shown in the DB
 
     // Getters and Setters
     public Long getId() {
@@ -68,20 +80,20 @@ public class Brand {
         this.image = image;
     }
 
-    public String getMetakey() {
-        return metakey;
+    public int getSortOrder() {
+        return sortOrder;
     }
 
-    public void setMetakey(String metakey) {
-        this.metakey = metakey;
+    public void setSortOrder(int sortOrder) {
+        this.sortOrder = sortOrder;
     }
 
-    public String getMetadesc() {
-        return metadesc;
+    public String getDescription() {
+        return description;
     }
 
-    public void setMetadesc(String metadesc) {
-        this.metadesc = metadesc;
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     public Date getCreatedAt() {
@@ -108,11 +120,11 @@ public class Brand {
         this.createdBy = createdBy;
     }
 
-    public int getUpdatedBy() {
+    public Integer getUpdatedBy() {
         return updatedBy;
     }
 
-    public void setUpdatedBy(int updatedBy) {
+    public void setUpdatedBy(Integer updatedBy) {
         this.updatedBy = updatedBy;
     }
 

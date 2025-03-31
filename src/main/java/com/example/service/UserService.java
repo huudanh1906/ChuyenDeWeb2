@@ -35,6 +35,9 @@ public class UserService implements UserDetailsService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private FileStorageService fileStorageService;
+
     /**
      * Phương thức từ UserDetailsService - dùng cho Spring Security
      */
@@ -62,8 +65,16 @@ public class UserService implements UserDetailsService {
                 user.getId(), user.getUsername(), user.getStatus(), user.getPassword().substring(0, 10) + "...");
 
         if (user.getStatus() != 1) {
-            logger.warn("Attempt to login with deactivated account: {}", usernameOrEmail);
-            throw new UsernameNotFoundException("Tài khoản đã bị vô hiệu hóa");
+            if (user.getStatus() == 0) {
+                logger.warn("Attempt to login with deleted account: {}", usernameOrEmail);
+                throw new UsernameNotFoundException("Tài khoản đã bị xóa");
+            } else if (user.getStatus() == 2) {
+                logger.warn("Attempt to login with deactivated account: {}", usernameOrEmail);
+                throw new UsernameNotFoundException("Tài khoản đã bị vô hiệu hóa");
+            } else {
+                logger.warn("Attempt to login with account having unknown status: {}", usernameOrEmail);
+                throw new UsernameNotFoundException("Tài khoản có trạng thái không hợp lệ");
+            }
         }
 
         return UserPrincipal.create(user);
@@ -85,8 +96,16 @@ public class UserService implements UserDetailsService {
         logger.debug("User found by ID: Username={}, Status={}", user.getUsername(), user.getStatus());
 
         if (user.getStatus() != 1) {
-            logger.warn("Attempt to authenticate with deactivated account ID: {}", id);
-            throw new UsernameNotFoundException("Tài khoản đã bị vô hiệu hóa");
+            if (user.getStatus() == 0) {
+                logger.warn("Attempt to authenticate with deleted account ID: {}", id);
+                throw new UsernameNotFoundException("Tài khoản đã bị xóa");
+            } else if (user.getStatus() == 2) {
+                logger.warn("Attempt to authenticate with deactivated account ID: {}", id);
+                throw new UsernameNotFoundException("Tài khoản đã bị vô hiệu hóa");
+            } else {
+                logger.warn("Attempt to authenticate with account having unknown status ID: {}", id);
+                throw new UsernameNotFoundException("Tài khoản có trạng thái không hợp lệ");
+            }
         }
 
         return UserPrincipal.create(user);
@@ -103,11 +122,40 @@ public class UserService implements UserDetailsService {
     }
 
     /**
+     * Get all active and inactive users (không bao gồm users trong thùng rác)
+     */
+    public List<User> getAllNonTrashedUsers() {
+        return userRepository.findAll().stream()
+                .filter(user -> user.getStatus() != 0) // status 1 (active) hoặc 2 (inactive)
+                .sorted(Comparator.comparing(User::getCreatedAt).reversed())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get all users regardless of status
+     */
+    public List<User> getAllUsers() {
+        return userRepository.findAll().stream()
+                .sorted(Comparator.comparing(User::getCreatedAt).reversed())
+                .collect(Collectors.toList());
+    }
+
+    /**
      * Get all trashed users
      */
     public List<User> getAllTrashedUsers() {
         return userRepository.findAll().stream()
-                .filter(user -> user.getStatus() == 0)
+                .filter(user -> user.getStatus() == 0) // chỉ lấy users có status = 0 (trashed)
+                .sorted(Comparator.comparing(User::getCreatedAt).reversed())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get all inactive (but not trashed) users
+     */
+    public List<User> getAllInactiveUsers() {
+        return userRepository.findAll().stream()
+                .filter(user -> user.getStatus() == 2) // chỉ lấy users có status = 2 (inactive)
                 .sorted(Comparator.comparing(User::getCreatedAt).reversed())
                 .collect(Collectors.toList());
     }
@@ -143,6 +191,11 @@ public class UserService implements UserDetailsService {
         // Encode password using Spring Security's PasswordEncoder
         user.setPassword(passwordEncoder.encode(user.getPassword()));
 
+        // Đặt giá trị mặc định cho gender nếu chưa có
+        if (user.getGender() == null) {
+            user.setGender(1); // 1: Nam, 0: Nữ
+        }
+
         return userRepository.save(user);
     }
 
@@ -169,6 +222,7 @@ public class UserService implements UserDetailsService {
         user.setAddress(address);
         user.setRoles("customer");
         user.setStatus(1);
+        user.setGender(1); // Mặc định là 1 (nam)
         user.setCreatedAt(new Date());
         user.setCreatedBy(1); // Default system user
 
@@ -187,12 +241,26 @@ public class UserService implements UserDetailsService {
             userOpt = userRepository.findByEmail(username);
         }
 
-        if (userOpt.isEmpty() || userOpt.get().getStatus() != 1) {
-            logger.warn("User not found or inactive: {}", username);
-            throw new RuntimeException("Tài khoản không tồn tại hoặc đã bị khóa");
+        if (userOpt.isEmpty()) {
+            logger.warn("User not found: {}", username);
+            throw new RuntimeException("Tài khoản không tồn tại");
         }
 
         User user = userOpt.get();
+
+        // Kiểm tra trạng thái user
+        if (user.getStatus() != 1) {
+            if (user.getStatus() == 0) {
+                logger.warn("Attempt to login with deleted account: {}", username);
+                throw new RuntimeException("Tài khoản đã bị xóa");
+            } else if (user.getStatus() == 2) {
+                logger.warn("Attempt to login with inactive account: {}", username);
+                throw new RuntimeException("Tài khoản đã bị vô hiệu hóa");
+            } else {
+                logger.warn("Attempt to login with account having unknown status: {}", username);
+                throw new RuntimeException("Tài khoản có trạng thái không hợp lệ");
+            }
+        }
 
         logger.debug("Found user: {}, checking password", user.getUsername());
 
@@ -243,13 +311,17 @@ public class UserService implements UserDetailsService {
      * Update user profile
      */
     public User updateProfile(Long id, String name, String phone, String email, String address,
-            String password, MultipartFile imageFile) throws IOException {
+            String password, Integer gender, MultipartFile imageFile) throws IOException {
         Optional<User> optionalUser = userRepository.findById(id);
         if (optionalUser.isEmpty()) {
             return null;
         }
 
         User user = optionalUser.get();
+
+        // Lưu tên ảnh cũ trước khi cập nhật
+        String oldImageFileName = user.getImage();
+        logger.info("User ID {} updating profile. Old image file name: {}", id, oldImageFileName);
 
         // Check if email is being used by another user
         Optional<User> emailUser = userRepository.findByEmail(email);
@@ -262,6 +334,7 @@ public class UserService implements UserDetailsService {
         user.setPhone(phone);
         user.setEmail(email);
         user.setAddress(address);
+        user.setGender(gender);
         user.setUpdatedAt(new Date());
 
         // Update password if provided
@@ -271,24 +344,43 @@ public class UserService implements UserDetailsService {
 
         // Handle image upload if provided
         if (imageFile != null && !imageFile.isEmpty()) {
+            logger.info("New image file provided for user ID {}: {}", id, imageFile.getOriginalFilename());
             String fileName = saveImage(imageFile);
+            logger.info("New image saved with filename: {}", fileName);
             user.setImage(fileName);
+
+            // Xóa ảnh cũ sau khi lưu ảnh mới thành công
+            if (oldImageFileName != null && !oldImageFileName.isEmpty()) {
+                logger.info("Attempting to delete old image: {}", oldImageFileName);
+                boolean deleted = fileStorageService.deleteFile(oldImageFileName, "users");
+                logger.info("Old image deletion result: {}", deleted);
+            } else {
+                logger.info("No old image to delete for user ID {}", id);
+            }
+        } else {
+            logger.info("No new image file provided for user ID {}", id);
         }
 
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+        logger.info("User profile updated successfully for ID {}", id);
+        return savedUser;
     }
 
     /**
      * Update user profile with base64 image
      */
     public User updateProfileWithBase64Image(Long id, String name, String phone, String email, String address,
-            String password, String imageBase64) throws IOException {
+            String password, Integer gender, String imageBase64) throws IOException {
         Optional<User> optionalUser = userRepository.findById(id);
         if (optionalUser.isEmpty()) {
             return null;
         }
 
         User user = optionalUser.get();
+
+        // Lưu tên ảnh cũ trước khi cập nhật
+        String oldImageFileName = user.getImage();
+        logger.info("User ID {} updating profile with base64 image. Old image file name: {}", id, oldImageFileName);
 
         // Check if email is being used by another user
         Optional<User> emailUser = userRepository.findByEmail(email);
@@ -301,6 +393,7 @@ public class UserService implements UserDetailsService {
         user.setPhone(phone);
         user.setEmail(email);
         user.setAddress(address);
+        user.setGender(gender);
         user.setUpdatedAt(new Date());
 
         // Update password if provided
@@ -310,27 +403,55 @@ public class UserService implements UserDetailsService {
 
         // Handle base64 image if provided
         if (imageBase64 != null && !imageBase64.isEmpty()) {
+            logger.info("New base64 image provided for user ID {}", id);
             String fileName = saveBase64Image(imageBase64);
+            logger.info("New base64 image saved with filename: {}", fileName);
             user.setImage(fileName);
+
+            // Xóa ảnh cũ sau khi lưu ảnh mới thành công
+            if (oldImageFileName != null && !oldImageFileName.isEmpty()) {
+                logger.info("Attempting to delete old image: {}", oldImageFileName);
+                boolean deleted = fileStorageService.deleteFile(oldImageFileName, "users");
+                logger.info("Old image deletion result: {}", deleted);
+            } else {
+                logger.info("No old image to delete for user ID {}", id);
+            }
+        } else {
+            logger.info("No new base64 image provided for user ID {}", id);
         }
 
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+        logger.info("User profile updated successfully for ID {}", id);
+        return savedUser;
     }
 
     /**
      * Delete user
      */
     public boolean deleteUser(Long id) {
-        if (!userRepository.existsById(id)) {
+        Optional<User> userOptional = userRepository.findById(id);
+        if (userOptional.isEmpty()) {
             return false;
         }
 
+        // Lấy thông tin user trước khi xóa để lấy tên file ảnh
+        User user = userOptional.get();
+        String imageFileName = user.getImage();
+
+        // Xóa hình ảnh liên quan nếu có
+        if (imageFileName != null && !imageFileName.isEmpty()) {
+            logger.info("Deleting image file for user ID {}: {}", id, imageFileName);
+            boolean imageDeleted = fileStorageService.deleteFile(imageFileName, "users");
+            logger.info("Image deletion result: {}", imageDeleted);
+        }
+
+        // Xóa user khỏi database
         userRepository.deleteById(id);
         return true;
     }
 
     /**
-     * Soft delete user (set status to 0)
+     * Soft delete user (set status to 0 - trashed)
      */
     public User softDeleteUser(Long id) {
         Optional<User> optionalUser = userRepository.findById(id);
@@ -339,14 +460,14 @@ public class UserService implements UserDetailsService {
         }
 
         User user = optionalUser.get();
-        user.setStatus(0);
+        user.setStatus(0); // 0: Trashed
         user.setUpdatedAt(new Date());
 
         return userRepository.save(user);
     }
 
     /**
-     * Restore user (set status to 1)
+     * Restore user (set status to 1 - active)
      */
     public User restoreUser(Long id) {
         Optional<User> optionalUser = userRepository.findById(id);
@@ -355,14 +476,14 @@ public class UserService implements UserDetailsService {
         }
 
         User user = optionalUser.get();
-        user.setStatus(1);
+        user.setStatus(1); // 1: Active
         user.setUpdatedAt(new Date());
 
         return userRepository.save(user);
     }
 
     /**
-     * Toggle user status
+     * Toggle user status between active (1) and inactive (2)
      */
     public User toggleUserStatus(Long id) {
         Optional<User> optionalUser = userRepository.findById(id);
@@ -371,64 +492,30 @@ public class UserService implements UserDetailsService {
         }
 
         User user = optionalUser.get();
-        user.setStatus(user.getStatus() == 1 ? 0 : 1);
+
+        // Chỉ toggle giữa trạng thái active (1) và inactive (2)
+        // Nếu user đang ở trạng thái trashed (0), thì sẽ đặt là active (1)
+        if (user.getStatus() == 1) {
+            user.setStatus(2); // 2: Inactive
+        } else {
+            user.setStatus(1); // 1: Active
+        }
+
         user.setUpdatedAt(new Date());
 
         return userRepository.save(user);
     }
 
     private String saveImage(MultipartFile imageFile) throws IOException {
-        // Create uploads directory if it doesn't exist
-        String uploadDir = "uploads/users";
-        Path uploadPath = Paths.get(uploadDir);
-        if (!Files.exists(uploadPath)) {
-            Files.createDirectories(uploadPath);
-        }
-
-        // Generate unique filename
-        String originalFilename = imageFile.getOriginalFilename();
-        String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-        String fileName = UUID.randomUUID().toString() + extension;
-
-        // Save file
-        Path filePath = uploadPath.resolve(fileName);
-        Files.copy(imageFile.getInputStream(), filePath);
-
-        return fileName;
+        // Sử dụng FileStorageService thay vì lưu trực tiếp
+        logger.info("Delegating image save to FileStorageService from UserService.saveImage()");
+        return fileStorageService.saveFile(imageFile, "users");
     }
 
     private String saveBase64Image(String base64String) throws IOException {
-        // Create uploads directory if it doesn't exist
-        String uploadDir = "uploads/users";
-        Path uploadPath = Paths.get(uploadDir);
-        if (!Files.exists(uploadPath)) {
-            Files.createDirectories(uploadPath);
-        }
-
-        // Clean up the base64 string
-        String[] parts = base64String.split(",");
-        String imageString = parts.length > 1 ? parts[1] : parts[0];
-
-        // Determine file extension from the data URL
-        String extension = ".jpg"; // Default to jpg
-        if (parts.length > 1 && parts[0].contains("image/")) {
-            String mimeType = parts[0].split(":")[1].split(";")[0];
-            if (mimeType.equals("image/png")) {
-                extension = ".png";
-            } else if (mimeType.equals("image/gif")) {
-                extension = ".gif";
-            }
-        }
-
-        // Generate unique filename
-        String fileName = UUID.randomUUID().toString() + extension;
-
-        // Decode and save the image
-        byte[] imageBytes = Base64.getDecoder().decode(imageString);
-        Path filePath = uploadPath.resolve(fileName);
-        Files.write(filePath, imageBytes);
-
-        return fileName;
+        // Sử dụng FileStorageService thay vì lưu trực tiếp
+        logger.info("Delegating base64 image save to FileStorageService from UserService.saveBase64Image()");
+        return fileStorageService.saveBase64Image(base64String, "users");
     }
 
     public boolean existsByUsername(String username) {

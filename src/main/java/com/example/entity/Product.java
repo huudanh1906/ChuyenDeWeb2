@@ -22,14 +22,13 @@ public class Product {
     private String slug;
     private BigDecimal price;
 
-    @Column(name = "price_sale")
-    private BigDecimal priceSale;
+    @Column(name = "pricesale")
+    private BigDecimal pricesale;
 
     private String image;
     private int qty;
     private String detail;
-    private String metakey;
-    private String metadesc;
+    private String description;
 
     @Column(name = "created_at")
     private Date createdAt;
@@ -94,12 +93,12 @@ public class Product {
         this.price = price;
     }
 
-    public BigDecimal getPriceSale() {
-        return priceSale;
+    public BigDecimal getPricesale() {
+        return pricesale;
     }
 
-    public void setPriceSale(BigDecimal priceSale) {
-        this.priceSale = priceSale;
+    public void setPricesale(BigDecimal pricesale) {
+        this.pricesale = pricesale;
     }
 
     public String getImage() {
@@ -126,20 +125,12 @@ public class Product {
         this.detail = detail;
     }
 
-    public String getMetakey() {
-        return metakey;
+    public String getDescription() {
+        return description;
     }
 
-    public void setMetakey(String metakey) {
-        this.metakey = metakey;
-    }
-
-    public String getMetadesc() {
-        return metadesc;
-    }
-
-    public void setMetadesc(String metadesc) {
-        this.metadesc = metadesc;
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     public Date getCreatedAt() {

@@ -33,6 +33,7 @@ public class UserDTO {
     private String address;
     private String image;
     private String roles;
+    private Integer gender; // 1: Nam, 0: Nữ
     private Date createdAt;
     private Date updatedAt;
     private int status;
@@ -139,6 +140,14 @@ public class UserDTO {
 
     public void setRoles(String roles) {
         this.roles = roles;
+    }
+
+    public Integer getGender() {
+        return gender;
+    }
+
+    public void setGender(Integer gender) {
+        this.gender = gender;
     }
 
     public Date getCreatedAt() {

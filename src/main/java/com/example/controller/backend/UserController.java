@@ -1,6 +1,7 @@
 package com.example.controller.backend;
 
 import com.example.entity.User;
+import com.example.security.UserPrincipal;
 import com.example.service.UserService;
 import com.example.service.FileStorageService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,6 +9,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.Authentication;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.*;
@@ -17,18 +22,23 @@ import java.util.*;
 @CrossOrigin(origins = "*")
 public class UserController {
 
+    private static final Logger logger = LoggerFactory.getLogger(UserController.class);
+
     @Autowired
     private UserService userService;
 
     @Autowired
     private FileStorageService fileStorageService;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     /**
      * Display a listing of the resource.
      */
     @GetMapping
     public ResponseEntity<List<User>> index() {
-        List<User> users = userService.getAllActiveUsers();
+        List<User> users = userService.getAllNonTrashedUsers();
         return ResponseEntity.ok(users);
     }
 
@@ -44,8 +54,16 @@ public class UserController {
             @RequestParam("phone") String phone,
             @RequestParam("address") String address,
             @RequestParam("roles") String roles,
-            @RequestParam("status") int status,
+            @RequestParam(value = "status", required = false, defaultValue = "1") int status,
+            @RequestParam(value = "gender", required = false, defaultValue = "1") Integer gender,
             @RequestParam(value = "image", required = false) MultipartFile imageFile) {
+
+        // Validate phone number length
+        if (phone.length() != 10) {
+            Map<String, String> response = new HashMap<>();
+            response.put("error", "Phone number must be 10 digits");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
 
         try {
             // Check if username already exists
@@ -73,6 +91,7 @@ public class UserController {
             user.setAddress(address);
             user.setRoles(roles);
             user.setStatus(status);
+            user.setGender(gender);
             user.setCreatedBy(1); // Default to system user (replace with actual authentication)
 
             // Handle image upload if provided
@@ -126,8 +145,16 @@ public class UserController {
             @RequestParam("address") String address,
             @RequestParam("roles") String roles,
             @RequestParam("status") int status,
+            @RequestParam(value = "gender", required = false) Integer gender,
             @RequestParam(value = "image", required = false) MultipartFile imageFile,
             @RequestParam(value = "imageBase64", required = false) String imageBase64) {
+
+        // Validate phone number length
+        if (phone.length() != 10) {
+            Map<String, String> response = new HashMap<>();
+            response.put("error", "Phone number must be 10 digits");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
 
         try {
             Optional<User> optionalUser = userService.getUserById(id);
@@ -154,6 +181,7 @@ public class UserController {
             userDetails.setAddress(address);
             userDetails.setRoles(roles);
             userDetails.setStatus(status);
+            userDetails.setGender(gender);
             userDetails.setUpdatedBy(1); // Replace with actual authentication logic for user ID
 
             // Handle image upload
@@ -266,9 +294,12 @@ public class UserController {
      * Get the profile of the authenticated user.
      */
     @GetMapping("/profile")
-    public ResponseEntity<?> profile() {
-        // Mock getting the authenticated user - replace with actual authentication
-        Optional<User> user = userService.getUserById(1L);
+    public ResponseEntity<?> profile(Authentication authentication) {
+        // Lấy ID người dùng từ xác thực
+        UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
+        Long userId = userPrincipal.getId();
+
+        Optional<User> user = userService.getUserById(userId);
         if (user.isEmpty()) {
             Map<String, String> response = new HashMap<>();
             response.put("error", "User not found");
@@ -286,14 +317,18 @@ public class UserController {
             @RequestParam("email") String email,
             @RequestParam("phone") String phone,
             @RequestParam("address") String address,
+            @RequestParam(value = "gender", required = false) Integer gender,
             @RequestParam(value = "password", required = false) String password,
-            @RequestParam(value = "image", required = false) MultipartFile imageFile) {
+            @RequestParam(value = "image", required = false) MultipartFile imageFile,
+            Authentication authentication) {
 
         try {
-            // Mock getting the authenticated user ID - replace with actual authentication
-            Long userId = 1L;
+            // Lấy ID người dùng từ xác thực
+            UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
+            Long userId = userPrincipal.getId();
 
-            User updatedUser = userService.updateProfile(userId, name, phone, email, address, password, imageFile);
+            User updatedUser = userService.updateProfile(userId, name, phone, email, address, password, gender,
+                    imageFile);
 
             if (updatedUser != null) {
                 Map<String, Object> response = new HashMap<>();
@@ -305,6 +340,200 @@ public class UserController {
                 response.put("error", "Failed to update profile");
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
             }
+        } catch (Exception e) {
+            Map<String, String> response = new HashMap<>();
+            response.put("error", "Error updating profile: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Partially update user information
+     */
+    @PatchMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> partialUpdate(
+            @PathVariable Long id,
+            @RequestParam(value = "name", required = false) String name,
+            @RequestParam(value = "email", required = false) String email,
+            @RequestParam(value = "phone", required = false) String phone,
+            @RequestParam(value = "address", required = false) String address,
+            @RequestParam(value = "roles", required = false) String roles,
+            @RequestParam(value = "status", required = false) Integer status,
+            @RequestParam(value = "gender", required = false) Integer gender,
+            @RequestParam(value = "password", required = false) String password,
+            @RequestParam(value = "image", required = false) MultipartFile imageFile,
+            @RequestParam(value = "imageBase64", required = false) String imageBase64) {
+
+        try {
+            Optional<User> optionalUser = userService.getUserById(id);
+            if (optionalUser.isEmpty()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "User not found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+
+            User user = optionalUser.get();
+
+            // Lưu tên ảnh cũ trước khi cập nhật
+            String oldImageFileName = user.getImage();
+
+            // Check if email already exists for another user
+            if (email != null && !email.equals(user.getEmail())) {
+                Optional<User> existingEmail = userService.getUserByEmail(email);
+                if (existingEmail.isPresent() && !existingEmail.get().getId().equals(id)) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", false);
+                    response.put("message", "Email already exists for another user");
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+                }
+                user.setEmail(email);
+            }
+
+            // Update only provided fields
+            if (name != null) {
+                user.setName(name);
+            }
+            if (phone != null) {
+                user.setPhone(phone);
+            }
+            if (address != null) {
+                user.setAddress(address);
+            }
+            if (roles != null) {
+                user.setRoles(roles);
+            }
+            if (status != null) {
+                user.setStatus(status);
+            }
+            if (gender != null) {
+                user.setGender(gender);
+            }
+            if (password != null && !password.isEmpty()) {
+                user.setPassword(passwordEncoder.encode(password));
+            }
+
+            // Handle image upload
+            if (imageFile != null && !imageFile.isEmpty()) {
+                String fileName = fileStorageService.saveFile(imageFile, "users");
+                user.setImage(fileName);
+
+                // Xóa ảnh cũ sau khi lưu ảnh mới thành công
+                if (oldImageFileName != null && !oldImageFileName.isEmpty()) {
+                    fileStorageService.deleteFile(oldImageFileName, "users");
+                }
+            } else if (imageBase64 != null && !imageBase64.isEmpty() && imageBase64.contains("base64")) {
+                String fileName = fileStorageService.saveBase64Image(imageBase64, "users");
+                user.setImage(fileName);
+
+                // Xóa ảnh cũ sau khi lưu ảnh mới thành công
+                if (oldImageFileName != null && !oldImageFileName.isEmpty()) {
+                    fileStorageService.deleteFile(oldImageFileName, "users");
+                }
+            }
+
+            user.setUpdatedAt(new Date());
+            user.setUpdatedBy(1); // Replace with actual authentication logic for user ID
+
+            User updatedUser = userService.updateUser(id, user);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "User updated successfully");
+            response.put("user", updatedUser);
+            return ResponseEntity.ok(response);
+        } catch (IOException e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Failed to upload image: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Error updating user: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Partially update the profile of the authenticated user.
+     */
+    @PatchMapping("/profile")
+    public ResponseEntity<?> partialUpdateProfile(
+            @RequestParam(value = "name", required = false) String name,
+            @RequestParam(value = "email", required = false) String email,
+            @RequestParam(value = "phone", required = false) String phone,
+            @RequestParam(value = "address", required = false) String address,
+            @RequestParam(value = "gender", required = false) Integer gender,
+            @RequestParam(value = "password", required = false) String password,
+            @RequestParam(value = "image", required = false) MultipartFile imageFile,
+            Authentication authentication) {
+
+        try {
+            // Lấy ID người dùng từ xác thực
+            UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
+            Long userId = userPrincipal.getId();
+
+            Optional<User> optionalUser = userService.getUserById(userId);
+            if (optionalUser.isEmpty()) {
+                Map<String, String> response = new HashMap<>();
+                response.put("error", "User not found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+
+            User user = optionalUser.get();
+
+            // Lưu tên ảnh cũ trước khi cập nhật
+            String oldImageFileName = user.getImage();
+
+            // Check if email already exists for another user
+            if (email != null && !email.equals(user.getEmail())) {
+                Optional<User> existingEmail = userService.getUserByEmail(email);
+                if (existingEmail.isPresent() && !existingEmail.get().getId().equals(userId)) {
+                    Map<String, String> response = new HashMap<>();
+                    response.put("error", "Email already in use by another user");
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+                }
+                user.setEmail(email);
+            }
+
+            // Update only provided fields
+            if (name != null) {
+                user.setName(name);
+            }
+            if (phone != null) {
+                user.setPhone(phone);
+            }
+            if (address != null) {
+                user.setAddress(address);
+            }
+            if (gender != null) {
+                user.setGender(gender);
+            }
+            if (password != null && !password.isEmpty()) {
+                user.setPassword(passwordEncoder.encode(password));
+            }
+
+            // Handle image upload
+            if (imageFile != null && !imageFile.isEmpty()) {
+                String fileName = fileStorageService.saveFile(imageFile, "users");
+                user.setImage(fileName);
+
+                // Xóa ảnh cũ sau khi lưu ảnh mới thành công
+                if (oldImageFileName != null && !oldImageFileName.isEmpty()) {
+                    fileStorageService.deleteFile(oldImageFileName, "users");
+                }
+            }
+
+            user.setUpdatedAt(new Date());
+            user.setUpdatedBy(1); // Replace with actual authentication logic for user ID
+
+            User updatedUser = userService.updateUser(userId, user);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Profile updated successfully");
+            response.put("user", updatedUser);
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("error", "Error updating profile: " + e.getMessage());

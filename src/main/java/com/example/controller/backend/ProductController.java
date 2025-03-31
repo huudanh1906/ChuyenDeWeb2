@@ -53,15 +53,21 @@ public class ProductController {
             @RequestParam("name") String name,
             @RequestParam("slug") String slug,
             @RequestParam("price") BigDecimal price,
-            @RequestParam("price_sale") BigDecimal priceSale,
+            @RequestParam("pricesale") BigDecimal pricesale,
             @RequestParam("qty") int qty,
             @RequestParam("detail") String detail,
-            @RequestParam("metakey") String metakey,
-            @RequestParam("metadesc") String metadesc,
+            @RequestParam("description") String description,
             @RequestParam("status") int status,
-            @RequestParam(value = "image", required = false) MultipartFile imageFile) {
+            @RequestParam(value = "image", required = false) MultipartFile imageFile,
+            org.springframework.security.core.Authentication authentication) {
 
         try {
+            // Extract user ID from authentication object
+            Long userId = 0L;
+            if (authentication != null && authentication.getPrincipal() instanceof com.example.security.UserPrincipal) {
+                userId = ((com.example.security.UserPrincipal) authentication.getPrincipal()).getId();
+            }
+
             // Validate category and brand
             Optional<Category> category = categoryService.getCategoryById(categoryId);
             if (category.isEmpty()) {
@@ -83,13 +89,12 @@ public class ProductController {
             product.setName(name);
             product.setSlug(slug);
             product.setPrice(price);
-            product.setPriceSale(priceSale);
+            product.setPricesale(pricesale);
             product.setQty(qty);
             product.setDetail(detail);
-            product.setMetakey(metakey);
-            product.setMetadesc(metadesc);
+            product.setDescription(description);
             product.setStatus(status);
-            product.setCreatedBy(1); // Replace with actual authentication logic for user ID
+            product.setCreatedBy(userId.intValue());
 
             productService.createProduct(product, imageFile);
 
@@ -153,16 +158,22 @@ public class ProductController {
             @RequestParam("name") String name,
             @RequestParam("slug") String slug,
             @RequestParam("price") BigDecimal price,
-            @RequestParam("price_sale") BigDecimal priceSale,
+            @RequestParam("pricesale") BigDecimal pricesale,
             @RequestParam("qty") int qty,
             @RequestParam("detail") String detail,
-            @RequestParam("metakey") String metakey,
-            @RequestParam("metadesc") String metadesc,
+            @RequestParam("description") String description,
             @RequestParam("status") int status,
             @RequestParam(value = "image", required = false) MultipartFile imageFile,
-            @RequestParam(value = "imageBase64", required = false) String imageBase64) {
+            @RequestParam(value = "imageBase64", required = false) String imageBase64,
+            org.springframework.security.core.Authentication authentication) {
 
         try {
+            // Extract user ID from authentication object
+            Long userId = 0L;
+            if (authentication != null && authentication.getPrincipal() instanceof com.example.security.UserPrincipal) {
+                userId = ((com.example.security.UserPrincipal) authentication.getPrincipal()).getId();
+            }
+
             Optional<Product> optionalProduct = productService.getProductById(id);
             if (optionalProduct.isEmpty()) {
                 Map<String, String> response = new HashMap<>();
@@ -191,13 +202,12 @@ public class ProductController {
             productDetails.setName(name);
             productDetails.setSlug(slug);
             productDetails.setPrice(price);
-            productDetails.setPriceSale(priceSale);
+            productDetails.setPricesale(pricesale);
             productDetails.setQty(qty);
             productDetails.setDetail(detail);
-            productDetails.setMetakey(metakey);
-            productDetails.setMetadesc(metadesc);
+            productDetails.setDescription(description);
             productDetails.setStatus(status);
-            productDetails.setUpdatedBy(1); // Replace with actual authentication logic for user ID
+            productDetails.setUpdatedBy(userId.intValue());
 
             Product updatedProduct;
 
@@ -253,17 +263,44 @@ public class ProductController {
      * Toggle the status of the specified resource.
      */
     @PutMapping("/{id}/status")
-    public ResponseEntity<Map<String, String>> status(@PathVariable Long id) {
-        Product updatedProduct = productService.toggleProductStatus(id);
-        if (updatedProduct != null) {
+    public ResponseEntity<Map<String, String>> status(
+            @PathVariable Long id,
+            org.springframework.security.core.Authentication authentication) {
+
+        try {
+            // Extract user ID from authentication object
+            Long userId = 0L;
+            if (authentication != null && authentication.getPrincipal() instanceof com.example.security.UserPrincipal) {
+                userId = ((com.example.security.UserPrincipal) authentication.getPrincipal()).getId();
+            }
+
+            // First get the product to update updatedBy
+            Optional<Product> productOpt = productService.getProductById(id);
+            if (productOpt.isEmpty()) {
+                Map<String, String> response = new HashMap<>();
+                response.put("error", "Product not found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+
+            Product product = productOpt.get();
+            product.setUpdatedBy(userId.intValue());
+            productService.updateProduct(id, product, null);
+
+            Product updatedProduct = productService.toggleProductStatus(id);
+            if (updatedProduct != null) {
+                Map<String, String> response = new HashMap<>();
+                response.put("message", "Product status updated successfully");
+                response.put("status", String.valueOf(updatedProduct.getStatus()));
+                return ResponseEntity.ok(response);
+            } else {
+                Map<String, String> response = new HashMap<>();
+                response.put("error", "Product not found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+        } catch (IOException e) {
             Map<String, String> response = new HashMap<>();
-            response.put("message", "Product status updated successfully");
-            response.put("status", String.valueOf(updatedProduct.getStatus()));
-            return ResponseEntity.ok(response);
-        } else {
-            Map<String, String> response = new HashMap<>();
-            response.put("error", "Product not found");
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            response.put("error", "Error updating product: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 
@@ -271,16 +308,43 @@ public class ProductController {
      * Soft delete the specified resource.
      */
     @PutMapping("/{id}/delete")
-    public ResponseEntity<Map<String, String>> delete(@PathVariable Long id) {
-        Product deletedProduct = productService.softDeleteProduct(id);
-        if (deletedProduct != null) {
+    public ResponseEntity<Map<String, String>> delete(
+            @PathVariable Long id,
+            org.springframework.security.core.Authentication authentication) {
+
+        try {
+            // Extract user ID from authentication object
+            Long userId = 0L;
+            if (authentication != null && authentication.getPrincipal() instanceof com.example.security.UserPrincipal) {
+                userId = ((com.example.security.UserPrincipal) authentication.getPrincipal()).getId();
+            }
+
+            // First get the product to update updatedBy
+            Optional<Product> productOpt = productService.getProductById(id);
+            if (productOpt.isEmpty()) {
+                Map<String, String> response = new HashMap<>();
+                response.put("error", "Product not found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+
+            Product product = productOpt.get();
+            product.setUpdatedBy(userId.intValue());
+            productService.updateProduct(id, product, null);
+
+            Product deletedProduct = productService.softDeleteProduct(id);
+            if (deletedProduct != null) {
+                Map<String, String> response = new HashMap<>();
+                response.put("message", "Product moved to trash successfully");
+                return ResponseEntity.ok(response);
+            } else {
+                Map<String, String> response = new HashMap<>();
+                response.put("error", "Product not found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+        } catch (IOException e) {
             Map<String, String> response = new HashMap<>();
-            response.put("message", "Product moved to trash successfully");
-            return ResponseEntity.ok(response);
-        } else {
-            Map<String, String> response = new HashMap<>();
-            response.put("error", "Product not found");
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            response.put("error", "Error updating product: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 
@@ -297,16 +361,43 @@ public class ProductController {
      * Restore the specified resource from trash.
      */
     @PutMapping("/{id}/restore")
-    public ResponseEntity<Map<String, String>> restore(@PathVariable Long id) {
-        Product restoredProduct = productService.restoreProduct(id);
-        if (restoredProduct != null) {
+    public ResponseEntity<Map<String, String>> restore(
+            @PathVariable Long id,
+            org.springframework.security.core.Authentication authentication) {
+
+        try {
+            // Extract user ID from authentication object
+            Long userId = 0L;
+            if (authentication != null && authentication.getPrincipal() instanceof com.example.security.UserPrincipal) {
+                userId = ((com.example.security.UserPrincipal) authentication.getPrincipal()).getId();
+            }
+
+            // First get the product to update updatedBy
+            Optional<Product> productOpt = productService.getProductById(id);
+            if (productOpt.isEmpty()) {
+                Map<String, String> response = new HashMap<>();
+                response.put("error", "Product not found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+
+            Product product = productOpt.get();
+            product.setUpdatedBy(userId.intValue());
+            productService.updateProduct(id, product, null);
+
+            Product restoredProduct = productService.restoreProduct(id);
+            if (restoredProduct != null) {
+                Map<String, String> response = new HashMap<>();
+                response.put("message", "Product restored successfully");
+                return ResponseEntity.ok(response);
+            } else {
+                Map<String, String> response = new HashMap<>();
+                response.put("error", "Product not found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+        } catch (IOException e) {
             Map<String, String> response = new HashMap<>();
-            response.put("message", "Product restored successfully");
-            return ResponseEntity.ok(response);
-        } else {
-            Map<String, String> response = new HashMap<>();
-            response.put("error", "Product not found");
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            response.put("error", "Error updating product: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 

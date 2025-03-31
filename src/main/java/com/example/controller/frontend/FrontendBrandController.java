@@ -18,11 +18,11 @@ public class FrontendBrandController {
     private BrandService brandService;
 
     /**
-     * Get all active brands
+     * Get only truly active brands (status = 1) for frontend display
      */
     @GetMapping
     public ResponseEntity<List<Brand>> index() {
-        List<Brand> brands = brandService.getAllActiveBrands();
+        List<Brand> brands = brandService.getOnlyActiveBrands();
         return ResponseEntity.ok(brands);
     }
 }
